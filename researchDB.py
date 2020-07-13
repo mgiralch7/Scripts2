@@ -3,6 +3,7 @@ import mysql.connector
 from getpass import getpass
 from mysql.connector import Error
 from mysql.connector import errorcode
+import statistics
 
 def connect():
 	usrname = input("Enter username: ")
@@ -214,7 +215,7 @@ def inTable(cursor,table,sess,colname,colvalue):
 
 def addDemographicData(cnx):
 	cursor = cnx.cursor()
-	fpath = str(input("File path with demographic data: "))
+	fpath = str(input("File path with tab-separated demographic data: "))
 	fdemo = open(fpath,'r')
 	header = fdemo.readline().replace('\n','').split('\t')
 	for line in fdemo:
@@ -222,7 +223,7 @@ def addDemographicData(cnx):
 		sess = line[0]+"_1"
 		i = 1
 		while i<(len(line)-1):
-			if inTable(cursor,'demographicData',sess,'measure',header[i])==False:
+			if len(line[i].replace(' ',''))>0 and inTable(cursor,'demographicData',sess,'measure',header[i])==False:
 				cursor.execute("insert into demographicData(sess,measure,value) values('"+sess+"','"+header[i]+"','"+line[i]+"')")
 			i+=1
 	fdemo.close()
@@ -245,7 +246,7 @@ def ttest(cnx,column,grp1,grp2):
 	design = open(outDir+"/design.mat",'w')
 	design.write("/NumWaves 2\n")
 	design.write("/NumPoints "+str(len(mat)-1)+'\n')
-	design.write("/Ppheights 1 1")
+	design.write("/Ppheights 1 1\n")
 	for line in mat:
 		design.write(line+'\n')
 	design.close()
@@ -253,11 +254,55 @@ def ttest(cnx,column,grp1,grp2):
 	# 2. Generate contrast file (design.con)
 	contrast = open(outDir+"/design.con",'w')
 	contrast.write("/NumWaves 2\n")
+	contrast.write("/ContrastName1 "+grp1+'>'+grp2+'\n')
+	contrast.write("/ContrastName2 "+grp2+'>'+grp1+'\n')
 	contrast.write("/NumContrasts 2\n")
-	contrast.write("/PPheights 1 1")
-	contrast.write("/Matrix")
+	contrast.write("/PPheights 1 1\n")
+	contrast.write("/Matrix\n")
 	contrast.write("1 -1\n")
 	contrast.write("-1 1\n")
+	contrast.close()
+
+	cursor.close()
+	sbjList.close()
+
+def ttestEV1(cnx,grp_col,grp1,grp2,ev_col,ev_grp1,ev_grp2):
+	sbjList = open(input("Subject list: "),'r')
+	outDir = input("Output dir: ")
+	cursor = cnx.cursor()
+
+	# 1. Get the information of each sbj from the db
+	grp_dic = {}
+	ev_dic = {}
+	for sbj in sbjList:
+		sbj = sbj.replace('\n','')
+		cursor.execute("select "+grp_col+","+ev_col+" from subjects where sbjID='"+sbj+"'")
+		for (grp,ev) in cursor:
+			if (grp==grp1 or grp==grp2) and (ev==ev_grp1 or ev==ev_grp2):
+				grp_dic[sbj] = '1 0' if grp==grp1 else '0 1'
+				ev_dic[sbj] = 1 if ev==ev_grp1 else 0
+	
+	# 2. Generate design matrix (design.mat)
+	# For the EV, mean center its values by subtracting the overal mean
+	M = statistics.mean(ev_dic.values())
+	design = open(outDir+"/design.mat",'w')
+	design.write("/NumWaves 3\n")
+	design.write("/NumPoints "+str(len(grp_dic.keys()))+'\n')
+	design.write("/Matrix\n")
+	for sbj,grp in grp_dic.items():
+		ev = ev_dic[sbj]-M
+		design.write(grp+' '+str(ev)+'\n')
+	design.close()
+
+	# 3. Generate contrast file (design.con)
+	contrast = open(outDir+"/design.con",'w')
+	contrast.write("/NumWaves 3\n")
+	contrast.write("/ContrastName1 "+grp1+'>'+grp2+'\n')
+	contrast.write("/ContrastName2 "+grp2+'>'+grp1+'\n')
+	contrast.write("/NumContrasts 2\n")
+	contrast.write("/Matrix\n")
+	contrast.write("1 -1 0\n")
+	contrast.write("-1 1 0\n")
 	contrast.close()
 
 	cursor.close()

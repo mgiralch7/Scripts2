@@ -18,13 +18,14 @@ def printMenu():
 	print("10. Add demographic data")
 	print("11. Generate two-sample unpaired ttest matrices (grp)")
 	print("12. Generate two-sample unpaired ttest matrices (scan_grp)")
+	print("13. Generate two-sample unpaired ttest matrices (grp, adjusted for scan_grp)")
 	print(67 * '-')
 
 def start(cnx):
 	loop = True
 	while loop:
 		printMenu()
-		choice = input("Enter your choice [0-11]: ")
+		choice = input("Enter your choice [0-13]: ")
 			
 		if choice == "1":
 			print("Initializing database...")
@@ -92,6 +93,11 @@ def start(cnx):
 				print("You're not connected to any database")
 			else:
 				researchDB.ttest(cnx,"scan_grp","POST","PRE")
+		elif choice == "13":
+			if cnx.database is None:
+				print("You're not connected to any database")
+			else:
+				researchDB.ttestEV1(cnx,"grp","CON","EPI","scan_grp","POST","PRE")
 		else:
 			print("Wrong choice, good bye")
 
