@@ -10,22 +10,23 @@ def printMenu():
 	print("2. Connect to an existing database")
 	print("3. See list of tables")
 	print("4. Find missing subjects from list")
-	print("5. Find subjects missing info from list")
-	print("6. Update subjects group from file")
-	print("7. Add scan group")
-	print("8. Add subjects to step")
-	print("9. Update subjects to step")
-	print("10. Add demographic data")
-	print("11. Generate two-sample unpaired ttest matrices (grp)")
-	print("12. Generate two-sample unpaired ttest matrices (scan_grp)")
-	print("13. Generate two-sample unpaired ttest matrices (grp, adjusted for scan_grp)")
+	print("5. Add missing subjects from list")
+	print("6. Find subjects missing info from list")
+	print("7. Update subjects group from file")
+	print("8. Add scan group")
+	print("9. Add subjects to step")
+	print("10. Update subjects to step")
+	print("11. Add demographic data")
+	print("12. Generate two-sample unpaired ttest matrices (grp)")
+	print("13. Generate two-sample unpaired ttest matrices (scan_grp)")
+	print("14. Generate two-sample unpaired ttest matrices (grp, adjusted for scan_grp)")
 	print(67 * '-')
 
 def start(cnx):
 	loop = True
 	while loop:
 		printMenu()
-		choice = input("Enter your choice [0-13]: ")
+		choice = input("Enter your choice [0-14]: ")
 			
 		if choice == "1":
 			print("Initializing database...")
@@ -51,9 +52,14 @@ def start(cnx):
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
+				researchDB.addMissingSubjects(cnx)
+		elif choice == "6":
+			if cnx.database is None:
+				print("You're not connected to any database")
+			else:
 				column = input("Find missing value from what column?: ")
 				researchDB.findMissingSubjects(cnx,column)
-		elif choice == "6":
+		elif choice == "7":
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
@@ -63,37 +69,37 @@ def start(cnx):
 				cnx.close()
 			print("Good bye")
 			loop = False
-		elif choice == "7":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.addScanGrp(cnx)
 		elif choice == "8":
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
-				researchDB.addSbjsToStep(cnx)
+				researchDB.addScanGrp(cnx)
 		elif choice == "9":
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
-				researchDB.updateSbjsToStep(cnx)
+				researchDB.addSbjsToStep(cnx)
 		elif choice == "10":
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
-				researchDB.addDemographicData(cnx)
+				researchDB.updateSbjsToStep(cnx)
 		elif choice == "11":
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
-				researchDB.ttest(cnx,"grp","CON","EPI")
+				researchDB.addDemographicData(cnx)
 		elif choice == "12":
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
-				researchDB.ttest(cnx,"scan_grp","POST","PRE")
+				researchDB.ttest(cnx,"grp","CON","EPI")
 		elif choice == "13":
+			if cnx.database is None:
+				print("You're not connected to any database")
+			else:
+				researchDB.ttest(cnx,"scan_grp","POST","PRE")
+		elif choice == "14":
 			if cnx.database is None:
 				print("You're not connected to any database")
 			else:
