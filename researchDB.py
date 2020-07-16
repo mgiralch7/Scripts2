@@ -85,7 +85,7 @@ def findSbj(cnx,sbj,column):
 	cursor.close()
 
 def findMissingSubjects(cnx,column):
-	sbjList = str(input("Enter path to subject list: "))
+	sbjList = str(input("Enter path to tab-separated subject list: "))
 	flist = open(sbjList,'r')
 	outFile = str(input("Enter path to output file: "))
 	fout = open(outFile,'w')
@@ -98,9 +98,29 @@ def findMissingSubjects(cnx,column):
 	fout.close()
 	flist.close()
 
+def addMissingSubjects(cnx):
+	cursor = cnx.cursor()
+	fname = str(input("Enter space-separated file path: "))
+	flist = open(fname,'r')
+	excl = str(input("Exclusion criteria: "))
+	for line in flist:
+		array = line.replace('\n','').split(' ')
+		sbjID = array[0]
+		sess = sbjID+"_1"
+		grp = array[1]
+		site = array[2]
+		# Add subject to subjects table
+		cursor.execute("insert ignore into subjects(sbjID,grp,site) values('"+sbjID+"','"+grp+"','"+site+"')")
+		# Add session to sessions table
+		cursor.execute("insert ignore into sessions(sess,sbjID) values('"+sess+"','"+sbjID+"')")
+		# Add session to excluded table
+		cursor.execute("insert into excluded(sess,criteria) values('"+sess+"','"+excl+"')")
+	cnx.commit()
+	cursor.close()
+
 def addSbjGrp(cnx):
 	cursor = cnx.cursor()
-	fname = str(input("Enter file path: "))
+	fname = str(input("Enter tab-separated file path: "))
 	finfo = open(fname,'r')
 	for line in finfo:
 		line = line.replace('\n','')
@@ -114,7 +134,7 @@ def addSbjGrp(cnx):
 
 def addScanGrp(cnx):
 	cursor = cnx.cursor()
-	fname = str(input("Enter file path: "))
+	fname = str(input("Enter tab-separated file path: "))
 	finfo = open(fname,'r')
 	for line in finfo:
 		line = line.replace('\n','')
@@ -222,7 +242,7 @@ def addDemographicData(cnx):
 		line = line.replace('\n','').split('\t')
 		sess = line[0]+"_1"
 		i = 1
-		while i<(len(line)-1):
+		while i<len(line):
 			if len(line[i].replace(' ',''))>0 and inTable(cursor,'demographicData',sess,'measure',header[i])==False:
 				cursor.execute("insert into demographicData(sess,measure,value) values('"+sess+"','"+header[i]+"','"+line[i]+"')")
 			i+=1
@@ -307,3 +327,8 @@ def ttestEV1(cnx,grp_col,grp1,grp2,ev_col,ev_grp1,ev_grp2):
 
 	cursor.close()
 	sbjList.close()
+
+# grp_col: column (from subjects table) with the group that is being compared
+# cat_covars: array of measures (from the behavioralData table) that are being used as categorical covariates
+# cont_covars: array of measures (from the behavioralData table) that are being used as continuous covariates (must have numberical values)
+#def ttestEVs(cnx,grp_col,cat_covars,cont_covars):
