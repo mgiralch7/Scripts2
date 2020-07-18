@@ -4,6 +4,7 @@ from getpass import getpass
 from mysql.connector import Error
 from mysql.connector import errorcode
 import statistics
+import os
 
 def connect():
 	usrname = input("Enter username: ")
@@ -71,12 +72,12 @@ def showTables(cnx):
 		print(tname)
 	cursor.close()
 
-def findSbj(cnx,sbj,column):
+def findSbj(cnx,sbj,table,column):
 	cursor = cnx.cursor()
 	if column=='':
-		cursor.execute("select count(*) from subjects where sbjID='"+sbj+"'")
+		cursor.execute("select count(*) from "+table+" where sbjID='"+sbj+"'")
 	else:
-		cursor.execute("select count(*) from subjects where sbjID='"+sbj+"' and "+column+" is not NULL")
+		cursor.execute("select count(*) from "+table+" where sbjID='"+sbj+"' and "+column+" is not NULL")
 	for (row,) in cursor:
 		if(row==1):
 			return True
@@ -84,16 +85,16 @@ def findSbj(cnx,sbj,column):
 			return False
 	cursor.close()
 
-def findMissingSubjects(cnx,column):
+def findMissingSubjects(cnx,table,column):
 	sbjList = str(input("Enter path to tab-separated subject list: "))
 	flist = open(sbjList,'r')
 	outFile = str(input("Enter path to output file: "))
 	fout = open(outFile,'w')
 	for line in flist:
 		sbj = line.split('\t')[0].replace('\n','')
-		if column=='' and findSbj(cnx,sbj,'')==0:
+		if column=='' and findSbj(cnx,sbj,table,'')==0:
 			fout.write(sbj+'\n')
-		if column!='' and findSbj(cnx,sbj,column)==0:
+		if column!='' and findSbj(cnx,sbj,table,column)==0:
 			fout.write(sbj+'\n')
 	fout.close()
 	flist.close()
@@ -229,14 +230,27 @@ def inTable(cursor,table,sess,colname,colvalue):
         cursor.execute("select count(*) from "+table+" where sess='"+sess+"' and "+colname+"='"+colvalue+"'")
         res=False
         for (count,) in cursor:
-            if count>0:
-                res=True
+            res = count>0
         return(res)
+
+def findMissingDemographicData(cnx,array_measures):
+	cursor = cnx.cursor()
+	flist = open(input("Session list path: "),'r')
+	fout = open(input("Path output file: "),'w')
+	for sess in flist:
+		i = 0
+		cont = True
+		while i<len(array_measures) and cont:
+			cont = inTable(cursor,'demographicData',sess.replace('\n',''),'measure',array_measures[i])
+			i+=1
+		if cont == False:
+			fout.write(sess.replace('\n','')+' '+array_measures[i-1]+'\n')
+	fout.close()
+	flist.close()
 
 def addDemographicData(cnx):
 	cursor = cnx.cursor()
-	fpath = str(input("File path with tab-separated demographic data: "))
-	fdemo = open(fpath,'r')
+	fdemo = open(input("File path with tab-separated demographic data: "),'r')
 	header = fdemo.readline().replace('\n','').split('\t')
 	for line in fdemo:
 		line = line.replace('\n','').split('\t')
@@ -328,7 +342,162 @@ def ttestEV1(cnx,grp_col,grp1,grp2,ev_col,ev_grp1,ev_grp2):
 	cursor.close()
 	sbjList.close()
 
-# grp_col: column (from subjects table) with the group that is being compared
+# grp_col: column (from subjects table) with the groups that are being compared. There must be only two groups.
 # cat_covars: array of measures (from the behavioralData table) that are being used as categorical covariates
-# cont_covars: array of measures (from the behavioralData table) that are being used as continuous covariates (must have numberical values)
-#def ttestEVs(cnx,grp_col,cat_covars,cont_covars):
+# cont_covars: array of measures (from the behavioralData table) that are being used as continuous covariates (must have numerical values)
+# there cannot be any missing values for any subject
+def ttestEVs(cnx,grp_col,cat_covars,cont_covars):
+	cursor = cnx.cursor()
+	outDir = input("Output dir: ")
+	if os.path.isdir(outDir)==False:
+		return
+
+	### 1. Get the list of group values from the DB ###
+	groups = []
+	cursor.execute("select distinct "+grp_col+" from subjects where project='ECP'")
+	for (grp,) in cursor:
+		if grp != None:
+			groups+=[grp]
+
+	### 2. Get the list of subjects ###
+	sbjs = []
+	sbjpath = input("Path sbj list: ")
+	sbjList = open(sbjpath,'r')
+	if os.path.isfile(sbjpath)==False:
+		return
+	for sbj in sbjList:
+		sbjs+=[sbj.replace('\n','')]
+	sbjList.close()
+
+	### 3. Get the values of each categorical measure ###
+	cat_dic={}
+	for measure in cat_covars:
+		# Get the list of values for that measure from the DB
+		cursor.execute("select distinct value from demographicData where measure='"+measure+"'")
+		# save the values in the dictionary
+		vals_dic = {}
+		i=0
+		for (value,) in cursor:
+			vals_dic[value] = str(i)
+			i+=1
+		cat_dic[measure]=vals_dic
+
+	### 4. Generate the design matrix ###
+	# Generate the matirx
+	grpcols = []
+	othercols = {}
+	for sbj in sbjs:
+		# Get the subject group
+		cursor.execute("select "+grp_col+" from subjects where sbjID='"+sbj+"'")
+		for (sbjgrp,) in cursor:
+			sbjgrp = str(sbjgrp)
+		grpcols.append("1 0") if sbjgrp==groups[0] else grpcols.append("0 1")
+		# Get the value of each categorical measure for this subject
+		for measure in cat_covars:
+			if measure in othercols:
+				array_values = othercols[measure]
+			else:
+				array_values = []
+			cursor.execute("select value from demographicData where measure='"+measure+"' and sess='"+sbj+"_1'")
+			for (value,) in cursor:
+				tmp_dic = cat_dic[measure]
+				array_values+=[float(tmp_dic[value])]
+			othercols[measure] = array_values
+		# Get the value of each continuous measure for this subject
+		for measure in cont_covars:
+			if measure in othercols:
+				array_values = othercols[measure]
+			else:
+				array_values = []
+			cursor.execute("select value from demographicData where measure='"+measure+"' and sess='"+sbj+"_1'")
+			for (value,) in cursor:
+				array_values+=[float(value)]
+			othercols[measure] = array_values
+
+	# Mean center all the covariates
+	for key,values in othercols.items():
+		M = statistics.mean(values)
+		mcentered = []
+		for val in values:
+			mcentered+=[val-M]
+		othercols[key] = mcentered
+
+	# write header
+	design = open(outDir+"/design.mat",'w')
+	design.write("/NumWaves "+str(2+len(cat_covars)+len(cont_covars))+'\n')
+	design.write("/NumPoints "+str(len(sbjs))+'\n')
+	design.write("/Matrix\n")
+
+	# write the matrix
+	i=0
+	while i<len(sbjs):
+		design.write(grpcols[i])
+		for cov in cat_covars:
+			values = othercols[cov]
+			design.write(' '+str(values[i]))
+		for cov in cont_covars:
+			values = othercols[cov]
+			design.write(' '+str(values[i]))
+		design.write('\n')
+		i+=1
+	design.close()
+
+	### 5. Generate the contrast file ###
+	# write header
+	contrast = open(outDir+"/design.con",'w')
+	contrast.write("/NumWaves "+str(2+len(cat_covars)+len(cont_covars))+'\n')
+	contrast.write("/ContrastName1 "+groups[0]+'>'+groups[1]+'\n')
+	contrast.write("/ContrastName2 "+groups[1]+'>'+groups[0]+'\n')
+	i=3
+	for cov in cat_covars:
+		contrast.write("/ContrastName"+str(i)+' '+cov+"+\n")
+		contrast.write("/ContrastName"+str(i)+' '+cov+"-\n")
+		i+=1
+	for cov in cont_covars:
+		contrast.write("/ContrastName"+str(i)+' '+cov+"+\n")
+		contrast.write("/ContrastName"+str(i)+' '+cov+"-\n")
+		i+=1
+	contrast.write("/NumContrasts "+str(2+2*len(cat_covars)+2*len(cont_covars))+'\n')
+	contrast.write("/Matrix\n")
+
+	# write the matrix
+	n = len(cat_covars)+len(cont_covars)
+	contrast.write("1 -1"+n * " 0"+'\n')
+	contrast.write("-1 1"+n * " 0"+'\n')
+	pos = 2
+	while pos<(n+2):
+		line1="0 0"
+		line2="0 0"
+		i = 2
+		while i<(n+2):
+			if i==pos:
+				line1+=" 1"
+				line2+=" -1"
+			else:
+				line1+=" 0"
+				line2+=" 0"
+			i+=1
+		pos+=1
+		contrast.write(line1+'\n')
+		contrast.write(line2+'\n')
+	contrast.close()
+
+	cursor.close()
+
+def recoverPipestepsDesc(cnx):
+	cursor = cnx.cursor()
+	recfolder = input("Recovery folder path: ")
+	db = cnx.database
+	recfile = open(recfolder+'/'+db+".pipesteps.txt",'r')
+	for line in recfile:
+		line = line.replace('\n','')
+		array = line.split('\t')
+		step = array[0].replace("\"",'')
+		desc = array[2].replace("\"",'')
+		if desc=="\\N":
+			cursor.execute("update pipesteps set description=NULL where step='"+step+"'")
+		else:
+			cursor.execute("update pipesteps set description='"+desc+"' where step='"+step+"'")
+	recfile.close()
+	cnx.commit()
+	cursor.close()

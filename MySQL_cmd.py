@@ -3,109 +3,100 @@ import researchDB
 from mysql.connector import Error
 from mysql.connector import errorcode
 
-def printMenu():
+def menu1(cnx):
 	print(30 * '-', "MENU", 30 * '-')
 	print("0. Exit")
 	print("1. Initialize database for the first time")
 	print("2. Connect to an existing database")
-	print("3. See list of tables")
-	print("4. Find missing subjects from list")
-	print("5. Add missing subjects from list")
-	print("6. Find subjects missing info from list")
-	print("7. Update subjects group from file")
-	print("8. Add scan group")
-	print("9. Add subjects to step")
-	print("10. Update subjects to step")
-	print("11. Add demographic data")
-	print("12. Generate two-sample unpaired ttest matrices (grp)")
-	print("13. Generate two-sample unpaired ttest matrices (scan_grp)")
-	print("14. Generate two-sample unpaired ttest matrices (grp, adjusted for scan_grp)")
 	print(67 * '-')
+
+	choice = input("Enter your choice [0-2]: ")
+	if choice == "0":
+		print("Good bye")
+		return false
+	elif choice == "1":
+		print("Initializing database...")
+		cnx = researchDB.initDB(cnx)
+	elif choice == "2":
+		cnx = researchDB.selectDB(cnx)
+		db = cnx.database
+		if db is None:
+			print("Not connected to any database")
+		else:
+			print("Connected to "+db)
+	else:
+		print("Wrong choice")
+	return True
+
+def menu2(cnx):
+	print(30 * '-', "MENU", 30 * '-')
+	print("0. Exit")
+	print("1. See list of tables")
+	print("2. Find missing subjects from list")
+	print("3. Add missing subjects from list")
+	print("4. Find subjects missing info from list")
+	print("5. Update subjects group from file")
+	print("6. Add scan group")
+	print("7. Add subjects to step")
+	print("8. Update subjects to step")
+	print("9. Add demographic data")
+	print("10. Find missing demographic data")
+	print("11. Generate two-sample unpaired ttest matrices (grp)")
+	print("12. Generate two-sample unpaired ttest matrices (scan_grp)")
+	print("13. Generate two-sample unpaired ttest matrices (grp, adjusted for scan_grp)")
+	print("14. Generate two-sample unpaired ttest matrices (grp, adjusted for categorical & continous covariates)")
+	print("15. Recover pipesteps description")
+	print(67 * '-')
+
+	choice = input("Enter your choice [0-15]: ")
+	if choice == "0":
+		print("Good bye")
+		return False
+	elif choice == "1":
+		researchDB.showTables(cnx)
+	elif choice == "2":
+		researchDB.findMissingSubjects(cnx,'subjects','')
+	elif choice == "3":
+		researchDB.addMissingSubjects(cnx)
+	elif choice == "4":
+		table = input("Search what table? (default subjects): ")
+		if len(table)==0:
+			table = 'subjects'
+		column = input("Find missing value from what column?: ")
+		researchDB.findMissingSubjects(cnx,table,column)
+	elif choice == "5":
+		researchDB.addSbjGrp(cnx)
+	elif choice == "6":
+		researchDB.addScanGrp(cnx)
+	elif choice == "7":
+		researchDB.addSbjsToStep(cnx)
+	elif choice == "8":
+		researchDB.updateSbjsToStep(cnx)
+	elif choice == "9":
+		researchDB.addDemographicData(cnx)
+	elif choice == "10":
+		researchDB.findMissingDemographicData(cnx,['Sex','Education','Age','Race','Language1','MotherEduc','DomntHand','FSIQ'])
+	elif choice == "11":
+		researchDB.ttest(cnx,"grp","CON","EPI")
+	elif choice == "12":
+		researchDB.ttest(cnx,"scan_grp","POST","PRE")
+	elif choice == "13":
+		researchDB.ttestEV1(cnx,"grp","CON","EPI","scan_grp","POST","PRE")
+	elif choice == "14":
+		researchDB.ttestEVs(cnx,"grp",['Sex','Race'],['Education','Age'])
+	elif choice == "15":
+		researchDB.recoverPipestepsDesc(cnx)
+	else:
+		print("Wrong choice")
+	return True
 
 def start(cnx):
 	loop = True
 	while loop:
-		printMenu()
-		choice = input("Enter your choice [0-14]: ")
-			
-		if choice == "1":
-			print("Initializing database...")
-			cnx = researchDB.initDB(cnx)
-		elif choice == "2":
-			cnx = researchDB.selectDB(cnx)
-			db = cnx.database
-			if db is None:
-				print("Not connected to any database")
-			else:
-				print("Connected to "+db)
-		elif choice == "3":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.showTables(cnx)
-		elif choice == "4":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.findMissingSubjects(cnx,'')
-		elif choice == "5":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.addMissingSubjects(cnx)
-		elif choice == "6":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				column = input("Find missing value from what column?: ")
-				researchDB.findMissingSubjects(cnx,column)
-		elif choice == "7":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.addSbjGrp(cnx)
-		elif choice == "0":
-			if cnx.database is not None:
-				cnx.close()
-			print("Good bye")
-			loop = False
-		elif choice == "8":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.addScanGrp(cnx)
-		elif choice == "9":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.addSbjsToStep(cnx)
-		elif choice == "10":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.updateSbjsToStep(cnx)
-		elif choice == "11":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.addDemographicData(cnx)
-		elif choice == "12":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.ttest(cnx,"grp","CON","EPI")
-		elif choice == "13":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.ttest(cnx,"scan_grp","POST","PRE")
-		elif choice == "14":
-			if cnx.database is None:
-				print("You're not connected to any database")
-			else:
-				researchDB.ttestEV1(cnx,"grp","CON","EPI","scan_grp","POST","PRE")
+		if cnx.database is None:
+			loop = menu1(cnx)
 		else:
-			print("Wrong choice, good bye")
+			loop = menu2(cnx)
 
 def main():
 	try:
