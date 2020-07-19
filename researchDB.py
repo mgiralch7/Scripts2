@@ -451,12 +451,12 @@ def ttestEVs(cnx,grp_col,cat_covars,cont_covars):
 	i=3
 	for cov in cat_covars:
 		contrast.write("/ContrastName"+str(i)+' '+cov+"+\n")
-		contrast.write("/ContrastName"+str(i)+' '+cov+"-\n")
-		i+=1
+		contrast.write("/ContrastName"+str(i+1)+' '+cov+"-\n")
+		i+=2
 	for cov in cont_covars:
 		contrast.write("/ContrastName"+str(i)+' '+cov+"+\n")
-		contrast.write("/ContrastName"+str(i)+' '+cov+"-\n")
-		i+=1
+		contrast.write("/ContrastName"+str(i+1)+' '+cov+"-\n")
+		i+=2
 	contrast.write("/NumContrasts "+str(2+2*len(cat_covars)+2*len(cont_covars))+'\n')
 	contrast.write("/Matrix\n")
 
